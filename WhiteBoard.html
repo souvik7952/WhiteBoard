@@ -329,6 +329,16 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
     <span class="hm">Download</span>
   </button>
 
+  <button class="tb" id="btn-dl-frame" title="Download selected frame as PNG">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+    <span class="hm">Download Frame</span>
+  </button>
+
+  <button class="tb" id="btn-copy-frame" title="Copy selected frame to clipboard (Ctrl+Shift+C)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <span class="hm">Copy Frame</span>
+  </button>
+
 </div>
 
 <!-- SCROLLABLE CANVAS -->
@@ -929,6 +939,57 @@ document.getElementById('btn-dl').addEventListener('click',()=>{
   a.href=tmp.toDataURL('image/png'); a.click(); toast('Downloaded!');
 });
 
+/* ── DOWNLOAD SELECTED FRAME ── */
+document.getElementById('btn-dl-frame').addEventListener('click',()=>{
+  if(selState!=='selected'||!selRect||selRect.w<2||selRect.h<2){
+    toast('⚠️ Select a frame first using the Select tool (M)');
+    return;
+  }
+  const {x,y,w,h}=selRect;
+  const tmp=document.createElement('canvas');
+  tmp.width=Math.round(w); tmp.height=Math.round(h);
+  const tc=tmp.getContext('2d');
+  tc.fillStyle=dark?'#141413':'#f0eeea';
+  tc.fillRect(0,0,tmp.width,tmp.height);
+  if(gridOn) tc.drawImage(gcv,-Math.round(x),-Math.round(y));
+  tc.drawImage(wb,-Math.round(x),-Math.round(y));
+  const a=document.createElement('a');
+  a.download='frame-'+Date.now()+'.png';
+  a.href=tmp.toDataURL('image/png'); a.click();
+  toast('📦 Frame downloaded!');
+});
+
+/* ── COPY SELECTED FRAME TO CLIPBOARD ── */
+function buildFrameCanvas(){
+  if(selState!=='selected'||!selRect||selRect.w<2||selRect.h<2) return null;
+  const {x,y,w,h}=selRect;
+  const tmp=document.createElement('canvas');
+  tmp.width=Math.round(w); tmp.height=Math.round(h);
+  const tc=tmp.getContext('2d');
+  tc.fillStyle=dark?'#141413':'#f0eeea';
+  tc.fillRect(0,0,tmp.width,tmp.height);
+  if(gridOn) tc.drawImage(gcv,-Math.round(x),-Math.round(y));
+  tc.drawImage(wb,-Math.round(x),-Math.round(y));
+  return tmp;
+}
+
+document.getElementById('btn-copy-frame').addEventListener('click',copyFrame);
+
+function copyFrame(){
+  const tmp=buildFrameCanvas();
+  if(!tmp){ toast('⚠️ Select a frame first using the Select tool (M)'); return; }
+  if(!navigator.clipboard||!window.ClipboardItem){
+    toast('⚠️ Clipboard API not supported in this browser');
+    return;
+  }
+  tmp.toBlob(blob=>{
+    if(!blob){ toast('⚠️ Could not create image blob'); return; }
+    navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
+      .then(()=>toast('📋 Frame copied to clipboard!'))
+      .catch(()=>toast('⚠️ Clipboard write blocked — try Ctrl+Shift+C in a secure context'));
+  },'image/png');
+}
+
 /* ═══════════════════════════════════
    IMAGE PASTE + CROP
 ═══════════════════════════════════ */
@@ -1024,6 +1085,7 @@ document.addEventListener('keydown',e=>{
   if(ctrl&&e.key==='z'){e.preventDefault();undo();return;}
   if(ctrl&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){e.preventDefault();redo();return;}
   if(ctrl&&e.key==='s'){e.preventDefault();document.getElementById('btn-dl').click();return;}
+  if(ctrl&&e.shiftKey&&e.key==='C'){e.preventDefault();copyFrame();return;}
   if(ctrl&&e.key==='v') return;
   if(!ctrl) switch(e.key.toLowerCase()){
     case 'p':setTool('pen');break; case 'e':setTool('eraser');break;
